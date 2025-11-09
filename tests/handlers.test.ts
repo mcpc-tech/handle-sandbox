@@ -12,8 +12,8 @@ Deno.test({
   fn: async () => {
     const sandbox = new Sandbox();
 
-    sandbox.registerHandler("double", async (n: unknown) => {
-      return (n as number) * 2;
+    sandbox.registerHandler("double", (n: unknown) => {
+      return Promise.resolve((n as number) * 2);
     });
 
     sandbox.start();
@@ -33,12 +33,12 @@ Deno.test({
   fn: async () => {
     const sandbox = new Sandbox();
 
-    sandbox.registerHandler("add", async (a: unknown, b: unknown) => {
-      return (a as number) + (b as number);
+    sandbox.registerHandler("add", (a: unknown, b: unknown) => {
+      return Promise.resolve((a as number) + (b as number));
     });
 
-    sandbox.registerHandler("mul", async (a: unknown, b: unknown) => {
-      return (a as number) * (b as number);
+    sandbox.registerHandler("mul", (a: unknown, b: unknown) => {
+      return Promise.resolve((a as number) * (b as number));
     });
 
     sandbox.start();

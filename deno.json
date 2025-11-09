@@ -5,7 +5,7 @@
   "nodeModulesDir": "auto",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcpc-tech/mcpc.git"
+    "url": "git+https://github.com/mcpc-tech/handle-sandbox.git"
   },
   "exports": {
     ".": "./mod.ts",

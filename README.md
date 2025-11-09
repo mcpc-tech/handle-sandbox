@@ -2,13 +2,17 @@
 
 [![JSR](https://jsr.io/badges/@mcpc/handle-sandbox)](https://jsr.io/@mcpc/handle-sandbox)
 
-Simple and secure JavaScript code execution using Deno sandbox. Run user code in isolation with custom function injection.
+Simple and secure JavaScript code execution using Deno sandbox. Run user code in
+isolation with custom function injection.
 
 ## Features
 
-- 🔒 **Secure Sandboxing**: Uses Deno's permission system for isolated code execution
-- 🔌 **JSON-RPC IPC**: Handler calls transmitted via JSON-RPC between sandbox and host
-- 🎯 **Custom Functions**: Inject any async functions into sandbox via `registerHandler()`
+- 🔒 **Secure Sandboxing**: Uses Deno's permission system for isolated code
+  execution
+- 🔌 **JSON-RPC IPC**: Handler calls transmitted via JSON-RPC between sandbox
+  and host
+- 🎯 **Custom Functions**: Inject any async functions into sandbox via
+  `registerHandler()`
 - 📦 **Zero Config**: Automatically locates Deno binary from npm package
 - 🛡️ **Resource Limits**: Configurable timeouts and memory limits
 
@@ -16,11 +20,11 @@ Simple and secure JavaScript code execution using Deno sandbox. Run user code in
 
 ```bash
 # npm
-npm install @mcpc/handle-sandbox
+npm install @mcpc-tech/handle-sandbox
 
 # jsr
 npx jsr add @mcpc/handle-sandbox
-deno add @mcpc/handle-sandbox
+deno add @mcpc/handle-sandbox --allow-scripts=npm:deno
 ```
 
 ## Quick Start

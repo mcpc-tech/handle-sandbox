@@ -3,14 +3,8 @@ name: MCPC Core - Deno Tests
 on:
   push:
     branches: [main, develop]
-    paths:
-      - "packages/core/**"
-      - ".github/workflows/**"
   pull_request:
     branches: [main]
-    paths:
-      - "packages/core/**"
-      - ".github/workflows/**"
 
 jobs:
   test:
@@ -43,23 +37,21 @@ jobs:
           key: deno-${{ runner.os }}-${{ matrix.deno-version }}-${{ hashFiles('packages/core/deno.lock') }}
 
       - name: Install Dependencies
-        working-directory: packages/core
         run: deno cache mod.ts
 
+      - name: Install Deno Postscript
+        run: deno task install
+
       - name: Run Linter
-        working-directory: packages/core
         run: deno lint
 
       - name: Check Formatting
-        working-directory: packages/core
         run: deno fmt --check
 
       - name: Type Check
-        working-directory: packages/core
         run: deno check mod.ts
 
       - name: Run Tests
-        working-directory: packages/core
         run: deno task test
 
   coverage:
