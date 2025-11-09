@@ -58,27 +58,26 @@ export class Sandbox {
    */
   private getRuntimePath(): string {
     const baseDir = path.dirname(fileURLToPath(import.meta.url));
-    
-    // Try primary location: ../runtime/runtime.ts
-    const primaryPath = path.join(baseDir, "../runtime/runtime.ts");
-    if (existsSync(primaryPath)) {
-      return primaryPath;
-    }
 
-    // Fallback 1: runtime/runtime.ts (from base directory)
-    const fallback1 = path.join(baseDir, "runtime/runtime.ts");
-    if (existsSync(fallback1)) {
-      return fallback1;
-    }
+    const candidates = [
+      path.join(baseDir, "../runtime/runtime.ts"),
+      path.join(baseDir, "../runtime/runtime.mjs"),
+      path.join(baseDir, "runtime/runtime.ts"),
+      path.join(baseDir, "runtime/runtime.mjs"),
+      path.join(baseDir, "runtime.ts"),
+      path.join(baseDir, "runtime.mjs"),
+    ];
 
-    // Fallback 2: runtime.ts (from base directory)
-    const fallback2 = path.join(baseDir, "runtime.ts");
-    if (existsSync(fallback2)) {
-      return fallback2;
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        return candidate;
+      }
     }
 
     throw new Error(
-      `Runtime file not found. Tried:\n  - ${primaryPath}\n  - ${fallback1}\n  - ${fallback2}`
+      `Runtime file not found. Tried:\n${
+        candidates.map((p) => `  - ${p}`).join("\n")
+      }`,
     );
   }
 
@@ -107,8 +106,9 @@ export class Sandbox {
     });
 
     this.process.stdout?.on("data", (data: Buffer) => this.handleStdout(data));
-    this.process.stderr?.on("data", (data: Buffer) =>
-      console.error("Sandbox stderr:", data.toString())
+    this.process.stderr?.on(
+      "data",
+      (data: Buffer) => console.error("Sandbox stderr:", data.toString()),
     );
     this.process.on("error", (error: Error) => {
       console.error("Sandbox error:", error);
@@ -183,8 +183,8 @@ export class Sandbox {
           this.jsonRpc.createErrorResponse(
             request.id,
             JsonRpcErrorCode.METHOD_NOT_FOUND,
-            `Method not found: ${request.method}`
-          )
+            `Method not found: ${request.method}`,
+          ),
         );
       }
     } catch (error) {
@@ -192,8 +192,8 @@ export class Sandbox {
         this.jsonRpc.createErrorResponse(
           request.id,
           JsonRpcErrorCode.INTERNAL_ERROR,
-          error instanceof Error ? error.message : String(error)
-        )
+          error instanceof Error ? error.message : String(error),
+        ),
       );
     }
   }
@@ -212,7 +212,7 @@ export class Sandbox {
   private sendRequest(
     method: string,
     params?: unknown,
-    timeout?: number
+    timeout?: number,
   ): Promise<unknown> {
     if (!this.process) throw new Error("Sandbox not started");
 
@@ -245,7 +245,7 @@ export class Sandbox {
    */
   async execute(
     code: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<ExecutionResult> {
     try {
       const result = (await this.sendRequest(JsonRpcMethod.EXECUTE_CODE, {

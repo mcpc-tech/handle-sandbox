@@ -1,321 +1,173 @@
-# @mcpc/sandbox# @mcpc/plugin-code-execution
+# @mcpc/handle-sandbox
 
-
-
-[![JSR](https://jsr.io/badges/@mcpc/sandbox)](https://jsr.io/@mcpc/sandbox)[![JSR](https://jsr.io/badges/@mcpc/plugin-code-execution)](https://jsr.io/@mcpc/plugin-code-execution)
-
-[![npm](https://img.shields.io/npm/v/@mcpc-tech/plugin-code-execution)](https://www.npmjs.com/package/@mcpc-tech/plugin-code-execution)
+[![JSR](https://jsr.io/badges/@mcpc/handle-sandbox)](https://jsr.io/@mcpc/handle-sandbox)
 
 Simple and secure JavaScript code execution using Deno sandbox. Run user code in isolation with custom function injection.
 
-Secure JavaScript code execution sandbox using Deno for MCPC agents. This
+## Features
 
-## Featurespackage provides a safe environment to execute user-provided JavaScript code
-
-with MCP tool access via JSON-RPC IPC.
-
-- 🔒 **Secure**: Deno's permission system for isolated execution
-
-- 🔌 **Simple IPC**: JSON-RPC over stdin/stdout## Features
-
-- 🎯 **Custom Functions**: Inject any async functions into sandbox
-
-- 📦 **Zero Config**: Auto-locates Deno binary- 🔒 **Secure Sandboxing**: Uses Deno's permission system for isolated code
-
-- 🛡️ **Resource Limits**: Configurable timeouts and memory  execution
-
-- 🔌 **JSON-RPC IPC**: Tool calls are transmitted via JSON-RPC between sandbox
-
-## Installation  and host
-
-- 🚀 **Easy Integration**: Plugin-based integration with MCPC
-
-```bash- 📦 **Zero Config**: Automatically locates Deno binary from npm package
-
-# npm- 🛡️ **Resource Limits**: Configurable timeouts and memory limits
-
-npm install @mcpc/sandbox
+- 🔒 **Secure Sandboxing**: Uses Deno's permission system for isolated code execution
+- 🔌 **JSON-RPC IPC**: Handler calls transmitted via JSON-RPC between sandbox and host
+- 🎯 **Custom Functions**: Inject any async functions into sandbox via `registerHandler()`
+- 📦 **Zero Config**: Automatically locates Deno binary from npm package
+- 🛡️ **Resource Limits**: Configurable timeouts and memory limits
 
 ## Installation
 
+```bash
+# npm
+npm install @mcpc/handle-sandbox
+
 # jsr
-
-npx jsr add @mcpc/sandbox```bash
-
-deno add @mcpc/sandbox# npm
-
-```npm install @mcpc-tech/plugin-code-execution
-
-pnpm add @mcpc-tech/plugin-code-execution
+npx jsr add @mcpc/handle-sandbox
+deno add @mcpc/handle-sandbox
+```
 
 ## Quick Start
 
-# jsr
+### Basic Usage
 
-### Basic Usagenpx jsr add @mcpc/plugin-code-execution
+```typescript
+import { Sandbox } from "@mcpc/handle-sandbox";
 
-pnpm add jsr:@mcpc/plugin-code-execution
+const sandbox = new Sandbox();
+sandbox.start();
 
-```typescript```
+const result = await sandbox.execute(`
+  console.log("Hello from sandbox!");
+  return 1 + 1;
+`);
 
-import { Sandbox } from "@mcpc/sandbox";
+console.log(result.logs); // ["Hello from sandbox!"]
+console.log(result.result); // 2
 
-## Usage
+sandbox.stop();
+```
+
+### With Custom Functions
+
+```typescript
+import { Sandbox } from "@mcpc/handle-sandbox";
 
 const sandbox = new Sandbox();
 
-sandbox.start();### Basic Usage
+// Register custom functions
+sandbox.registerHandler("fetchUser", async (userId) => {
+  return { id: userId, name: "Alice" };
+});
 
+sandbox.registerHandler("saveData", async (data) => {
+  // Save to database
+  return { success: true };
+});
 
+sandbox.start();
 
-// Execute code```typescript
+// Use custom functions in code
+const result = await sandbox.execute(`
+  const user = await callHandler("fetchUser", 123);
+  console.log("User:", user.name);
+  
+  await callHandler("saveData", { userId: user.id, action: "login" });
+  return user;
+`);
 
-const result = await sandbox.execute(`import { mcpc } from "@mcpc/core";
-
-  console.log("Hello from sandbox!");import { createCodeExecutionPlugin } from "@mcpc/plugin-code-execution/plugin";
-
-  return 1 + 1;
-
-`);const server = await mcpc(
-
-  [{ name: "my-agent", version: "1.0.0" }, {
-
-console.log(result.logs);   // ["Hello from sandbox!"]    capabilities: { tools: {} },
-
-console.log(result.result); // 2  }],
-
-  [{
-
-sandbox.stop();    name: "my-agent",
-
-```    description: `
-
-      An agent that can execute JavaScript code securely.
-
-### With Custom Functions      <tool name="filesystem.read_file"/>
-
-      <tool name="filesystem.write_file"/>
-
-```typescript    `,
-
-const sandbox = new Sandbox();    deps: {
-
-      mcpServers: {
-
-// Register custom functions        "filesystem": {
-
-sandbox.registerHandler("fetchUser", async (userId: number) => {          command: "npx",
-
-  return { id: userId, name: "Alice" };          args: ["-y", "@wonderwhy-er/desktop-commander@latest"],
-
-});          transportType: "stdio",
-
-        },
-
-sandbox.registerHandler("saveData", async (data: any) => {      },
-
-  await db.save(data);    },
-
-  return { success: true };    plugins: [
-
-});      createCodeExecutionPlugin({
-
-        sandbox: {
-
-sandbox.start();          timeout: 30000, // 30 seconds
-
-          memoryLimit: 512, // 512 MB
-
-// Use custom functions in code          permissions: [], // No extra permissions
-
-const result = await sandbox.execute(`        },
-
-  const user = await fetchUser(123);      }),
-
-  console.log("User:", user.name);    ],
-
-      options: {
-
-  await saveData({ userId: user.id, action: "login" });      mode: "custom",
-
-  return user;    },
-
-`);  }],
-
-);
-
-sandbox.stop();```
-
+sandbox.stop();
 ```
-
-### How It Works
 
 ### With Timeout and Memory Limits
 
-The plugin uses bidirectional JSON-RPC communication:
-
 ```typescript
+import { Sandbox } from "@mcpc/handle-sandbox";
 
-const sandbox = new Sandbox({1. Host spawns Deno sandbox subprocess
+const sandbox = new Sandbox({
+  timeout: 5000, // 5 seconds
+  memoryLimit: 256, // 256 MB
+  permissions: ["--allow-net=api.example.com"],
+});
 
-  timeout: 5000,      // 5 seconds2. Host sends `executeCode` request with user's JavaScript code
+sandbox.start();
 
-  memoryLimit: 256,   // 256 MB3. Sandbox runs the code
+const result = await sandbox.execute(`
+  return "code runs here";
+`);
 
-  permissions: ["--allow-net=api.example.com"],4. When code calls `callMCPTool(toolName, params)`:
-
-});   - Sandbox sends `callTool` request to host
-
-   - Host executes the actual MCP tool
-
-sandbox.start();   - Host sends response back to sandbox
-
-const result = await sandbox.execute("...");   - Sandbox receives result and continues code execution
-
-sandbox.stop();5. Sandbox returns final execution result to host
-
+sandbox.stop();
 ```
 
-### Security Model
+## How It Works
+
+The sandbox uses bidirectional JSON-RPC communication:
+
+1. Host spawns Deno sandbox subprocess
+2. Host sends `executeCode` request with user's JavaScript code
+3. Sandbox runs the code
+4. When code calls `callHandler(name, ...args)`:
+   - Sandbox sends `callHandler` request to host
+   - Host executes the registered handler function
+   - Host sends response back to sandbox
+   - Sandbox receives result and continues code execution
+5. Sandbox returns final execution result to host
 
 ## API
 
-The Deno sandbox runs with minimal permissions by default. You control access by
+### `new Sandbox(config?)`
 
-### `new Sandbox(config?)`passing Deno permission flags directly:
+Create a new sandbox instance.
 
-
-
-Create a new sandbox instance.```typescript
-
-// No permissions - can only call MCP tools
-
-**Config Options:**createCodeExecutionPlugin();
+**Config Options:**
 
 - `timeout?: number` - Execution timeout in milliseconds (default: 30000)
+- `memoryLimit?: number` - Memory limit in MB
+- `permissions?: string[]` - Deno permission flags
 
-- `memoryLimit?: number` - Memory limit in MB// Allow network access to specific domains
+### `sandbox.registerHandler(name, handler)`
 
-- `permissions?: string[]` - Deno permission flagscreateCodeExecutionPlugin({
+Register a function that can be called from sandbox code.
 
-  sandbox: {
-
-### `sandbox.registerHandler(name, handler)`    permissions: ["--allow-net=github.com,api.example.com"],
-
-  },
-
-Register a function that can be called from sandbox code.});
-
-
-
-```typescript// Allow reading specific directories
-
-sandbox.registerHandler("myFunction", async (arg1, arg2) => {createCodeExecutionPlugin({
-
-  return result;  sandbox: {
-
-});    permissions: ["--allow-read=/tmp,/var/log"],
-
-```  },
-
+```typescript
+sandbox.registerHandler("myFunction", async (arg1, arg2) => {
+  return result;
 });
-
-### `sandbox.start()````
-
-
-
-Start the Deno subprocess. Call this before executing code.### Configuration Options
-
-
-
-### `sandbox.execute(code, context?)````typescript
-
-interface SandboxConfig {
-
-Execute JavaScript code in the sandbox.  timeout?: number; // Execution timeout in ms (default: 30000)
-
-  memoryLimit?: number; // Memory limit in MB (default: unlimited)
-
-**Returns:** `Promise<{ logs: string[], result?: any, error?: string }>`  permissions?: string[]; // Deno flags, e.g., ["--allow-net", "--allow-read=/tmp"]
-
-}
-
-**Parameters:**```
-
-- `code: string` - JavaScript code to execute
-
-- `context?: Record<string, any>` - Additional context (optional)Example with custom permissions:
-
-
-
-### `sandbox.stop()````typescript
-
-createCodeExecutionPlugin({
-
-Stop the sandbox and clean up resources.  sandbox: {
-
-    timeout: 60000,
-
-## How It Works    permissions: [
-
-      "--allow-net=api.example.com",
-
-```      "--allow-read=/tmp",
-
-┌─────────────────┐         JSON-RPC          ┌──────────────────┐      "--allow-env=HOME,USER",
-
-│   Your App      │◄─────────────────────────►│  Deno Sandbox    │    ],
-
-│  (Node.js)      │   stdin/stdout (IPC)      │  (Isolated)      │  },
-
-│                 │                            │                  │});
-
-│  registerHandler│                            │  await myFunc()  │```
-
-│  execute(code)  │                            │  console.log()   │
-
-└─────────────────┘                            └──────────────────┘## Architecture
-
 ```
 
-```mermaid
+### `sandbox.start()`
 
-1. Your app spawns Deno subprocesssequenceDiagram
+Start the Deno subprocess. Call this before executing code.
 
-2. Sends code to execute via JSON-RPC    participant Host as Host (Node)
+### `sandbox.execute(code, context?)`
 
-3. Sandbox runs code in isolated environment    participant Sandbox as Sandbox (Deno)
+Execute JavaScript code in the sandbox.
 
-4. When code calls registered functions, sandbox sends request back    
+**Returns:** `Promise<{ logs: string[], result?: any, error?: string }>`
 
-5. Your app handles request and sends response    Host->>Sandbox: executeCode("fetch('https://google.com')")
+**Parameters:**
 
-6. Sandbox receives response and continues execution    activate Sandbox
+- `code: string` - JavaScript code to execute
+- `context?: Record<string, any>` - Additional context (optional)
 
-    Note over Sandbox: deno run --no-prompt
+### `sandbox.stop()`
 
-## Examples    Sandbox--xHost: PermissionDenied: --allow-net needed
+Stop the sandbox and clean up resources.
 
-    deactivate Sandbox
+## Security Model
 
-See the `examples/` directory:    
+The Deno sandbox runs with minimal permissions by default. You control access by
+passing Deno permission flags directly:
 
-- `01-basic.ts` - Simple execution    Host->>Sandbox: executeCode("callMCPTool('http.fetch', ...)")
+```typescript
+// No permissions - can only call registered handlers
+new Sandbox();
 
-- `02-custom-functions.ts` - Custom function injection    activate Sandbox
+// Allow network access to specific domains
+new Sandbox({
+  permissions: ["--allow-net=github.com,api.example.com"],
+});
 
-- `03-mcp-integration.ts` - Using with MCP tools    Sandbox->>Host: callTool('http.fetch', {url: 'https://google.com'})
-
-    activate Host
-
-## License    Note over Host: Execute MCP tool
-
-    Host-->>Sandbox: {status: 200, body: "..."}
-
-MIT    deactivate Host
-
-    Sandbox-->>Host: execution result
-    deactivate Sandbox
+// Allow reading specific directories
+new Sandbox({
+  permissions: ["--allow-read=/tmp,/var/log"],
+});
 ```
 
 **Permission Model**
@@ -329,25 +181,42 @@ const code = `
   Deno.env.get('SECRET');                       // PermissionDenied: --allow-env needed
 `;
 
-// ✅ All operations must go through MCP tools:
-const code = `
-  await callMCPTool('desktop-commander.read_file', { path: '/file.txt' });
-  await callMCPTool('http-client.fetch', { url: 'https://api.com' });
-`;
-
-// Or grant specific permissions if needed:
-createCodeExecutionPlugin({
-  sandbox: {
-    permissions: ["--allow-net=api.example.com", "--allow-read=/tmp"],
-  },
+// ✅ Operations must use registered handlers:
+sandbox.registerHandler("readFile", async (path) => {
+  return await fs.readFile(path, "utf-8");
 });
+
+const code = `
+  const content = await callHandler("readFile", "/file.txt");
+`;
 ```
+
+## Architecture
+
+```
+┌─────────────────┐         JSON-RPC          ┌──────────────────┐
+│   Your App      │◄─────────────────────────►│  Deno Sandbox    │
+│  (Node.js)      │   stdin/stdout (IPC)      │  (Isolated)      │
+│                 │                            │                  │
+│  registerHandler│                            │  callHandler()   │
+│  execute(code)  │                            │  console.log()   │
+└─────────────────┘                            └──────────────────┘
+```
+
+## How It Works (Detailed)
+
+1. Your app spawns Deno subprocess
+2. Sends code to execute via JSON-RPC
+3. Sandbox runs code in isolated environment
+4. When code calls registered handlers, sandbox sends request back
+5. Your app handles request and sends response
+6. Sandbox receives response and continues execution
 
 ## Examples
 
 See `examples/` directory for complete examples:
 
-- `basic-usage.ts` - Simple code execution with plugin integration
+- `basic-usage.ts` - Simple code execution
 
 ## Development
 
@@ -355,7 +224,7 @@ See `examples/` directory for complete examples:
 # Run tests
 deno test --allow-all tests/
 
-# Run example
+# Run example  
 deno run --allow-all examples/basic-usage.ts
 ```
 

@@ -83,7 +83,10 @@ async function executeCode(
   };
 
   // Create handler functions dynamically
-  const handlerFunctions: Record<string, (...args: unknown[]) => Promise<unknown>> = {};
+  const handlerFunctions: Record<
+    string,
+    (...args: unknown[]) => Promise<unknown>
+  > = {};
   for (const handlerName of handlers) {
     handlerFunctions[handlerName] = async (...args: unknown[]) => {
       return await sendRequest(JsonRpcMethod.CALL_HANDLER, {

@@ -3,6 +3,7 @@
   "specifiers": {
     "jsr:@std/assert@1": "1.0.15",
     "jsr:@std/internal@^1.0.12": "1.0.12",
+    "npm:@types/node@*": "24.2.0",
     "npm:deno@^2.5.6": "2.5.6"
   },
   "jsr": {
@@ -47,6 +48,12 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
+    "@types/node@24.2.0": {
+      "integrity": "sha512-3xyG3pMCq3oYCNg7/ZP+E1ooTaGB4cG8JWRsqqOYQdbWNY4zbaV0Ennrd7stjiJEFZCaybcIgpTjJWHRfBSIDw==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
     "deno@2.5.6": {
       "integrity": "sha512-SSe2gCf41A/uln54H7xdKZFtiDt+reBxYM4IaJLRH/NpEIE5T3VOcLSLHPaJzyiTvZe2xMz1QFcpg4cco5rNsA==",
       "optionalDependencies": [
@@ -59,6 +66,9 @@
       ],
       "scripts": true,
       "bin": true
+    },
+    "undici-types@7.10.0": {
+      "integrity": "sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag=="
     }
   },
   "workspace": {

@@ -4,9 +4,9 @@
 
 // Sandbox configuration
 export interface SandboxConfig {
-  timeout?: number;        // Execution timeout in milliseconds (default: 30000)
-  memoryLimit?: number;    // Memory limit in MB
-  permissions?: string[];  // Deno permission flags
+  timeout?: number; // Execution timeout in milliseconds (default: 30000)
+  memoryLimit?: number; // Memory limit in MB
+  permissions?: string[]; // Deno permission flags
 }
 
 // Execution result

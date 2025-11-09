@@ -5,4 +5,4 @@
  */
 
 export { Sandbox } from "./src/sandbox.ts";
-export type { SandboxConfig, ExecutionResult } from "./src/types.ts";
+export type { ExecutionResult, SandboxConfig } from "./src/types.ts";

@@ -1,6 +1,6 @@
 {
   "name": "@mcpc/handle-sandbox",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "nodeModulesDir": "auto",
   "repository": {
@@ -16,7 +16,7 @@
     "deno": "npm:deno@^2.5.6"
   },
   "publish": {
-    "exclude": ["examples/**", "tests/**"]
+    "exclude": ["examples/**", "tests/**", ".vscode/**"]
   },
   "tasks": {
     "install": "deno install --allow-scripts=npm:deno",

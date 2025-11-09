@@ -15,7 +15,11 @@ export class JsonRpcHandler {
     return { jsonrpc: "2.0", id, result };
   }
 
-  createErrorResponse(id: string | number, code: number, message: string): JsonRpcResponse {
+  createErrorResponse(
+    id: string | number,
+    code: number,
+    message: string,
+  ): JsonRpcResponse {
     return { jsonrpc: "2.0", id, error: { code, message } };
   }
 
