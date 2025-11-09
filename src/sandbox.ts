@@ -48,7 +48,7 @@ export class Sandbox {
     ).resolve;
     if (!resolver) throw new Error("Cannot resolve deno package");
 
-    const pkgUrl = resolver("deno/package.json");
+    const pkgUrl = resolver("deno-bin/package.json");
     const denoDir = path.dirname(fileURLToPath(pkgUrl));
     return path.join(denoDir, "bin.cjs");
   }
