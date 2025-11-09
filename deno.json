@@ -1,0 +1,25 @@
+{
+  "name": "@mcpc/handle-sandbox",
+  "version": "0.0.1",
+  "license": "MIT",
+  "nodeModulesDir": "auto",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcpc-tech/mcpc.git"
+  },
+  "exports": {
+    ".": "./mod.ts",
+    "./runtime": "./runtime/runtime.ts"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@^1.0.0",
+    "deno": "npm:deno@^2.5.6"
+  },
+  "publish": {
+    "exclude": ["examples/**", "tests/**"]
+  },
+  "tasks": {
+    "install": "deno install --allow-scripts=npm:deno",
+    "test": "deno test --allow-all tests/"
+  }
+}

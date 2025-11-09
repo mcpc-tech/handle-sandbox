@@ -1,0 +1,11 @@
+{
+  "packages": [
+    {
+      "name": "@mcpc/handle-sandbox",
+      "version": "latest",
+      "packageJson": {
+        "name": "@mcpc-tech/handle-sandbox"
+      }
+    }
+  ]
+}
