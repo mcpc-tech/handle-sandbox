@@ -4,7 +4,10 @@
       "name": "@mcpc/handle-sandbox",
       "version": "latest",
       "packageJson": {
-        "name": "@mcpc-tech/handle-sandbox"
+        "name": "@mcpc-tech/handle-sandbox",
+        "dependencies": {
+          "deno": "^2.5.6"
+        }
       }
     }
   ]
