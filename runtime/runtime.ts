@@ -5,20 +5,21 @@
  * Communicates with host via JSON-RPC over stdin/stdout.
  */
 
-import {
-  JsonRpcMethod,
-  type JsonRpcRequest,
-  type JsonRpcResponse,
-} from "../src/types.ts";
+import { JsonRpcMethod, type JsonRpcRequest } from "../src/types.ts";
 
+// Global state
 const logs: string[] = [];
+const pendingResponses = new Map<
+  string | number,
+  { resolve: (value: unknown) => void; reject: (error: Error) => void }
+>();
+let messageBuffer = "";
 
 /**
  * Send JSON-RPC request to host and wait for response
  */
 async function sendRequest(method: string, params?: unknown): Promise<unknown> {
   const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
   const requestId = crypto.randomUUID();
 
   const request = JSON.stringify({
@@ -27,30 +28,12 @@ async function sendRequest(method: string, params?: unknown): Promise<unknown> {
     method,
     params,
   }) + "\n";
+
   await Deno.stdout.write(encoder.encode(request));
 
-  const buffer = new Uint8Array(65536);
-  while (true) {
-    const n = await Deno.stdin.read(buffer);
-    if (n === null) throw new Error("Stdin closed");
-
-    const data = decoder.decode(buffer.subarray(0, n));
-    const lines = data.split("\n").filter((line) => line.trim());
-
-    for (const line of lines) {
-      try {
-        const response: JsonRpcResponse = JSON.parse(line);
-        if (response.id !== requestId) continue;
-
-        if (response.error) {
-          throw new Error(`JSON-RPC Error: ${response.error.message}`);
-        }
-        return response.result;
-      } catch (e) {
-        if (!(e instanceof SyntaxError)) throw e;
-      }
-    }
-  }
+  return new Promise((resolve, reject) => {
+    pendingResponses.set(requestId, { resolve, reject });
+  });
 }
 
 /**
@@ -113,10 +96,63 @@ async function executeCode(
 }
 
 /**
+ * Process incoming message line
+ */
+function processMessage(line: string) {
+  try {
+    const message = JSON.parse(line);
+
+    // Check if it's a response to a handler call
+    if ("result" in message || "error" in message) {
+      const pending = pendingResponses.get(message.id);
+      if (pending) {
+        pendingResponses.delete(message.id);
+        if (message.error) {
+          pending.reject(new Error(message.error.message));
+        } else {
+          pending.resolve(message.result);
+        }
+      }
+      return;
+    }
+
+    // It's a request to execute code
+    if (message.method === JsonRpcMethod.EXECUTE_CODE) {
+      handleExecuteRequest(message);
+    }
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      console.error("Error processing message:", error);
+    }
+  }
+}
+
+/**
+ * Handle EXECUTE_CODE request
+ */
+async function handleExecuteRequest(request: JsonRpcRequest) {
+  const encoder = new TextEncoder();
+  const params = request.params as {
+    code: string;
+    context: Record<string, unknown>;
+    handlers: string[];
+  };
+
+  const result = await executeCode(params.code, params.handlers);
+
+  const response = JSON.stringify({
+    jsonrpc: "2.0",
+    id: request.id,
+    result,
+  }) + "\n";
+
+  await Deno.stdout.write(encoder.encode(response));
+}
+
+/**
  * Main message loop
  */
 async function main() {
-  const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const buffer = new Uint8Array(65536);
 
@@ -125,35 +161,14 @@ async function main() {
     if (n === null) break;
 
     const data = decoder.decode(buffer.subarray(0, n));
-    const lines = data.split("\n").filter((line) => line.trim());
+    messageBuffer += data;
+
+    const lines = messageBuffer.split("\n");
+    messageBuffer = lines.pop() || "";
 
     for (const line of lines) {
-      try {
-        const request: JsonRpcRequest = JSON.parse(line);
-        let result;
-
-        if (request.method === JsonRpcMethod.EXECUTE_CODE) {
-          const params = request.params as {
-            code: string;
-            context: Record<string, unknown>;
-            handlers: string[];
-          };
-          result = await executeCode(params.code, params.handlers);
-        } else {
-          continue;
-        }
-
-        const response = JSON.stringify({
-          jsonrpc: "2.0",
-          id: request.id,
-          result,
-        }) + "\n";
-
-        await Deno.stdout.write(encoder.encode(response));
-      } catch (error) {
-        if (!(error instanceof SyntaxError)) {
-          console.error("Error processing request:", error);
-        }
+      if (line.trim()) {
+        processMessage(line);
       }
     }
   }
