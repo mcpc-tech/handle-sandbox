@@ -197,14 +197,28 @@ const code = `
 
 ## Architecture
 
-```
-┌─────────────────┐         JSON-RPC          ┌──────────────────┐
-│   Your App      │◄─────────────────────────►│  Deno Sandbox    │
-│  (Node.js)      │   stdin/stdout (IPC)      │  (Isolated)      │
-│                 │                            │                  │
-│  registerHandler│                            │  callHandler()   │
-│  execute(code)  │                            │  console.log()   │
-└─────────────────┘                            └──────────────────┘
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant Host as Host (Node)
+    participant Sandbox as Sandbox (Deno)
+    
+    Host->>Sandbox: executeCode("fetch('https://google.com')")
+    activate Sandbox
+    Note over Sandbox: deno run --no-prompt
+    Sandbox--xHost: PermissionDenied: --allow-net needed
+    deactivate Sandbox
+    
+    Host->>Sandbox: executeCode("callMCPTool('http.fetch', ...)")
+    activate Sandbox
+    Sandbox->>Host: callTool('http.fetch', {url: 'https://google.com'})
+    activate Host
+    Note over Host: Execute MCP tool
+    Host-->>Sandbox: {status: 200, body: "..."}
+    deactivate Host
+    Sandbox-->>Host: execution result
+    deactivate Sandbox
 ```
 
 ## How It Works (Detailed)
