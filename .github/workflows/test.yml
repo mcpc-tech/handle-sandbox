@@ -1,4 +1,4 @@
-name: MCPC Core - Deno Tests
+name: handle-sandbox - Deno Tests
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/deno
-          key: deno-${{ runner.os }}-${{ matrix.deno-version }}-${{ hashFiles('packages/core/deno.lock') }}
+          key: deno-${{ runner.os }}-${{ matrix.deno-version }}-${{ hashFiles('deno.lock') }}
 
       - name: Install Dependencies
         run: deno cache mod.ts
@@ -69,16 +69,14 @@ jobs:
           deno-version: 2.x
 
       - name: Run Tests with Coverage
-        working-directory: packages/core
         run: deno test --allow-all --coverage=coverage tests/
 
       - name: Generate Coverage Report
-        working-directory: packages/core
         run: deno coverage coverage --lcov --output=coverage.lcov
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         continue-on-error: true
         with:
-          file: ./packages/core/coverage.lcov
-          flags: mcpc-core
+          file: ./coverage.lcov
+          flags: handle-sandbox
