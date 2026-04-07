@@ -15,10 +15,19 @@ import {
   type HandlerFunction,
   JsonRpcErrorCode,
   JsonRpcMethod,
+  type JsonRpcNotification,
   type JsonRpcRequest,
   type JsonRpcResponse,
+  type LogLevel,
   type SandboxConfig,
 } from "./types.ts";
+
+function normalizeLogLevel(level: unknown): LogLevel {
+  return level === "error" || level === "warn" || level === "info" ||
+      level === "log"
+    ? level
+    : "log";
+}
 
 export class Sandbox {
   private process: ChildProcess | null = null;
@@ -99,17 +108,31 @@ export class Sandbox {
       args.push(...this.config.permissions);
     }
 
+    if (this.config.extraArgs) {
+      args.push(...this.config.extraArgs);
+    }
+
     args.push(runtimePath);
 
     this.process = spawn(this.getDenoBinaryPath(), args, {
       stdio: ["pipe", "pipe", "pipe"],
+      ...(this.config.cwd && { cwd: this.config.cwd }),
+      ...(this.config.env && { env: this.config.env }),
     });
 
     this.process.stdout?.on("data", (data: Buffer) => this.handleStdout(data));
-    this.process.stderr?.on(
-      "data",
-      (data: Buffer) => console.error("Sandbox stderr:", data.toString()),
-    );
+    this.process.stderr?.on("data", (data: Buffer) => {
+      const text = data.toString();
+      if (this.config.onStderr) {
+        try {
+          this.config.onStderr(text);
+        } catch (error) {
+          console.error("Sandbox onStderr callback failed:", error);
+        }
+      } else {
+        console.error("Sandbox stderr:", text);
+      }
+    });
     this.process.on("error", (error: Error) => {
       console.error("Sandbox error:", error);
       this.cleanup();
@@ -137,12 +160,36 @@ export class Sandbox {
         continue;
       }
 
+      // Notification (no id) — streaming log output from runtime
+      if (!("id" in message) && "method" in message) {
+        this.handleNotification(message as JsonRpcNotification);
+        continue;
+      }
+
       if ("result" in message || "error" in message) {
         this.handleResponse(message as JsonRpcResponse);
       } else if ("method" in message) {
         this.handleRequest(message as JsonRpcRequest).catch((err) =>
           console.error("Error handling request:", err)
         );
+      }
+    }
+  }
+
+  /**
+   * Handle JSON-RPC notification from sandbox (fire-and-forget, no id)
+   */
+  private handleNotification(message: JsonRpcNotification): void {
+    if (message.method === JsonRpcMethod.LOG && this.config.onLog) {
+      const params = message.params as
+        | { text?: unknown; level?: unknown }
+        | undefined;
+      if (typeof params?.text !== "string") return;
+
+      try {
+        this.config.onLog(params.text, normalizeLogLevel(params.level));
+      } catch (error) {
+        console.error("Sandbox onLog callback failed:", error);
       }
     }
   }

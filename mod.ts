@@ -5,3 +5,4 @@
  */
 export { Sandbox } from "./src/sandbox.ts";
 export type { ExecutionResult, SandboxConfig } from "./src/types.ts";
+export type { LogLevel } from "./src/types.ts";

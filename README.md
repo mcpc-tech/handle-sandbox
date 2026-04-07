@@ -2,19 +2,20 @@
 
 [![JSR](https://jsr.io/badges/@mcpc/handle-sandbox)](https://jsr.io/@mcpc/handle-sandbox)
 
-Simple and secure JavaScript code execution using Deno sandbox. Run user code in
-isolation with custom function injection.
+Simple and secure JavaScript execution in an isolated Deno subprocess. Register
+async host functions, run untrusted code with explicit permissions, and
+optionally stream logs and stderr back to the host in real time.
 
 ## Features
 
-- 🔒 **Secure Sandboxing**: Uses Deno's permission system for isolated code
-  execution
-- 🔌 **JSON-RPC IPC**: Handler calls transmitted via JSON-RPC between sandbox
-  and host
-- 🎯 **Custom Functions**: Inject any async functions into sandbox via
-  `registerHandler()`
-- 📦 **Zero Config**: Automatically locates Deno binary from npm package
-- 🛡️ **Resource Limits**: Configurable timeouts and memory limits
+- **Secure sandboxing** with Deno permissions
+- **JSON-RPC IPC** between host and sandbox process
+- **Async host handlers** exposed directly inside sandboxed code
+- **Streaming logs** via `onLog(text, level)` before `execute()` resolves
+- **Streaming stderr** via `onStderr(text)`
+- **Process controls** for timeout, memory, permissions, `cwd`, `env`, and extra
+  Deno CLI args
+- **Zero-config runtime discovery** from the bundled `deno` package
 
 ## Installation
 
@@ -29,9 +30,9 @@ deno add @mcpc/handle-sandbox --allow-scripts=npm:deno
 
 ## Quick Start
 
-### Basic Usage
+### Basic usage
 
-```typescript
+```ts
 import { Sandbox } from "@mcpc/handle-sandbox";
 
 const sandbox = new Sandbox();
@@ -44,123 +45,186 @@ const result = await sandbox.execute(`
 
 console.log(result.logs); // ["Hello from sandbox!"]
 console.log(result.result); // 2
+console.log(result.error); // undefined
 
 sandbox.stop();
 ```
 
-### With Custom Functions
+### Register host handlers
 
-```typescript
+Registered handlers are available inside sandboxed code by the same name.
+
+```ts
 import { Sandbox } from "@mcpc/handle-sandbox";
 
 const sandbox = new Sandbox();
 
-// Register custom functions
 sandbox.registerHandler("fetchUser", async (userId) => {
   return { id: userId, name: "Alice" };
 });
 
-sandbox.registerHandler("saveData", async (data) => {
-  // Save to database
-  return { success: true };
+sandbox.registerHandler("saveAuditLog", async (payload) => {
+  return { ok: true, payload };
 });
 
 sandbox.start();
 
-// Use custom functions in code
 const result = await sandbox.execute(`
-  const user = await callHandler("fetchUser", 123);
+  const user = await fetchUser(123);
+  await saveAuditLog({ action: "login", userId: user.id });
   console.log("User:", user.name);
-  
-  await callHandler("saveData", { userId: user.id, action: "login" });
   return user;
 `);
 
+console.log(result.result); // { id: 123, name: "Alice" }
+console.log(result.logs); // ["User: Alice"]
+
 sandbox.stop();
 ```
 
-### With Timeout and Memory Limits
+### Stream logs and stderr
 
-```typescript
-import { Sandbox } from "@mcpc/handle-sandbox";
+```ts
+import { type LogLevel, Sandbox } from "@mcpc/handle-sandbox";
 
 const sandbox = new Sandbox({
-  timeout: 5000, // 5 seconds
-  memoryLimit: 256, // 256 MB
-  permissions: ["--allow-net=api.example.com"],
+  onLog: (text: string, level: LogLevel) => {
+    console.log(`[sandbox:${level}]`, text);
+  },
+  onStderr: (text) => {
+    process.stderr.write(`[sandbox:stderr] ${text}`);
+  },
 });
 
 sandbox.start();
 
 const result = await sandbox.execute(`
-  return "code runs here";
+  console.log("step 1");
+  console.warn("step 2");
+  await Deno.stderr.write(new TextEncoder().encode("warning from stderr\n"));
+  return "done";
 `);
+
+console.log(result.result); // "done"
 
 sandbox.stop();
 ```
 
-## How It Works
+### Configure permissions and process options
 
-The sandbox uses bidirectional JSON-RPC communication:
+```ts
+import { Sandbox } from "@mcpc/handle-sandbox";
 
-1. Host spawns Deno sandbox subprocess
-2. Host sends `executeCode` request with user's JavaScript code
-3. Sandbox runs the code
-4. When code calls `callHandler(name, ...args)`:
-   - Sandbox sends `callHandler` request to host
-   - Host executes the registered handler function
-   - Host sends response back to sandbox
-   - Sandbox receives result and continues code execution
-5. Sandbox returns final execution result to host
+const sandbox = new Sandbox({
+  timeout: 5_000,
+  memoryLimit: 256,
+  permissions: ["--allow-net=api.example.com", "--allow-env=API_TOKEN"],
+  cwd: process.cwd(),
+  env: {
+    ...process.env,
+    API_TOKEN: "example-token",
+  },
+  extraArgs: ["--quiet"],
+});
+
+sandbox.start();
+
+const result = await sandbox.execute(`
+  return {
+    cwd: Deno.cwd(),
+    tokenAvailable: Boolean(Deno.env.get("API_TOKEN")),
+  };
+`);
+
+console.log(result.result);
+
+sandbox.stop();
+```
 
 ## API
 
 ### `new Sandbox(config?)`
 
-Create a new sandbox instance.
+Create a sandbox instance.
 
-**Config Options:**
+#### Config options
 
-- `timeout?: number` - Execution timeout in milliseconds (default: 30000)
-- `memoryLimit?: number` - Memory limit in MB
-- `permissions?: string[]` - Deno permission flags
+- `timeout?: number` - Execution timeout in milliseconds. Default: `30000`
+- `memoryLimit?: number` - V8 max old space size in MB
+- `permissions?: string[]` - Deno permission flags such as
+  `"--allow-net=api.example.com"`
+- `extraArgs?: string[]` - Additional Deno CLI args such as `"--quiet"`
+- `cwd?: string` - Working directory for the sandbox subprocess
+- `env?: Record<string, string | undefined>` - Environment variables for the
+  sandbox subprocess
+- `onLog?: (text: string, level: LogLevel) => void` - Streaming console output
+  callback
+- `onStderr?: (text: string) => void` - Streaming stderr callback
 
 ### `sandbox.registerHandler(name, handler)`
 
-Register a function that can be called from sandbox code.
+Register an async host function that sandboxed code can call directly by name.
 
-```typescript
-sandbox.registerHandler("myFunction", async (arg1, arg2) => {
-  return result;
+```ts
+sandbox.registerHandler("double", async (value) => {
+  return Number(value) * 2;
 });
+
+const result = await sandbox.execute(`
+  return await double(21);
+`);
 ```
 
 ### `sandbox.start()`
 
-Start the Deno subprocess. Call this before executing code.
+Start the Deno subprocess. Call this before `execute()`.
 
 ### `sandbox.execute(code, context?)`
 
-Execute JavaScript code in the sandbox.
+Execute JavaScript code inside the sandbox.
 
-**Returns:** `Promise<{ logs: string[], result?: any, error?: string }>`
+#### Parameters
 
-**Parameters:**
+- `code: string` - JavaScript source to run
+- `context?: Record<string, unknown>` - Optional execution context
 
-- `code: string` - JavaScript code to execute
-- `context?: Record<string, any>` - Additional context (optional)
+#### Returns
+
+```ts
+Promise<{
+  logs: string[];
+  result?: unknown;
+  error?: string;
+}>;
+```
 
 ### `sandbox.stop()`
 
-Stop the sandbox and clean up resources.
+Stop the sandbox process and clean up resources.
 
-## Security Model
+### `LogLevel`
 
-The Deno sandbox runs with minimal permissions by default. You control access by
-passing Deno permission flags directly:
+```ts
+type LogLevel = "log" | "error" | "warn" | "info";
+```
 
-```typescript
-// No permissions - can only call registered handlers
+## How it works
+
+1. The host starts a Deno subprocess.
+2. The host sends user code to the subprocess over JSON-RPC.
+3. The sandbox executes the code in an isolated environment.
+4. Registered handlers are exposed as async functions inside the sandbox.
+5. Console output is returned in the final result and can also be streamed via
+   `onLog`.
+6. The subprocess stderr stream can be observed via `onStderr`.
+
+## Security model
+
+The sandbox runs with minimal Deno permissions by default. Grant only the
+permissions your use case needs.
+
+```ts
+// No permissions by default
 new Sandbox();
 
 // Allow network access to specific domains
@@ -172,78 +236,24 @@ new Sandbox({
 new Sandbox({
   permissions: ["--allow-read=/tmp,/var/log"],
 });
-```
 
-**Permission Model**
-
-```typescript
-// Sandbox runs WITHOUT permissions by default
-// ❌ These operations will fail:
-const code = `
-  await Deno.readTextFile('/file.txt');        // PermissionDenied: --allow-read needed
-  await fetch('https://api.com');               // PermissionDenied: --allow-net needed
-  Deno.env.get('SECRET');                       // PermissionDenied: --allow-env needed
-`;
-
-// ✅ Operations must use registered handlers:
-sandbox.registerHandler("readFile", async (path) => {
-  return await fs.readFile(path, "utf-8");
+// Allow access to selected environment variables
+new Sandbox({
+  permissions: ["--allow-env=API_TOKEN"],
 });
-
-const code = `
-  const content = await callHandler("readFile", "/file.txt");
-`;
 ```
 
-## Architecture
-
-## Architecture
-
-```mermaid
-sequenceDiagram
-    participant Host as Host (Node)
-    participant Sandbox as Sandbox (Deno)
-    
-    Host->>Sandbox: executeCode("fetch('https://google.com')")
-    activate Sandbox
-    Note over Sandbox: deno run --no-prompt
-    Sandbox--xHost: PermissionDenied: --allow-net needed
-    deactivate Sandbox
-    
-    Host->>Sandbox: executeCode("callMCPTool('http.fetch', ...)")
-    activate Sandbox
-    Sandbox->>Host: callTool('http.fetch', {url: 'https://google.com'})
-    activate Host
-    Note over Host: Execute MCP tool
-    Host-->>Sandbox: {status: 200, body: "..."}
-    deactivate Host
-    Sandbox-->>Host: execution result
-    deactivate Sandbox
-```
-
-## How It Works (Detailed)
-
-1. Your app spawns Deno subprocess
-2. Sends code to execute via JSON-RPC
-3. Sandbox runs code in isolated environment
-4. When code calls registered handlers, sandbox sends request back
-5. Your app handles request and sends response
-6. Sandbox receives response and continues execution
-
-## Examples
-
-See `examples/` directory for complete examples:
-
-- `basic-usage.ts` - Simple code execution
+Without the corresponding Deno permission flags, operations like file access,
+network access, and reading environment variables will fail.
 
 ## Development
 
 ```bash
-# Run tests
-deno test --allow-all tests/
+# format
+deno fmt
 
-# Run example  
-deno run --allow-all examples/basic-usage.ts
+# test
+deno test --allow-all tests/
 ```
 
 ## License

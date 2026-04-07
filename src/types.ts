@@ -7,7 +7,14 @@ export interface SandboxConfig {
   timeout?: number; // Execution timeout in milliseconds (default: 30000)
   memoryLimit?: number; // Memory limit in MB
   permissions?: string[]; // Deno permission flags
+  extraArgs?: string[]; // Extra Deno CLI args (e.g. ["--quiet"])
+  cwd?: string; // Working directory for the sandbox process
+  env?: Record<string, string | undefined>; // Environment variables for the sandbox process
+  onLog?: (text: string, level: LogLevel) => void; // Streaming log callback
+  onStderr?: (text: string) => void; // Streaming stderr callback
 }
+
+export type LogLevel = "log" | "error" | "warn" | "info";
 
 // Execution result
 export interface ExecutionResult {
@@ -20,11 +27,14 @@ export interface ExecutionResult {
 export type HandlerFunction = (...args: unknown[]) => Promise<unknown>;
 
 // JSON-RPC Protocol Types (internal use)
-export interface JsonRpcRequest {
+export interface JsonRpcNotification {
   jsonrpc: "2.0";
-  id: string | number;
   method: string;
   params?: unknown;
+}
+
+export interface JsonRpcRequest extends JsonRpcNotification {
+  id: string | number;
 }
 
 export interface JsonRpcResponse {
@@ -33,6 +43,11 @@ export interface JsonRpcResponse {
   result?: unknown;
   error?: JsonRpcError;
 }
+
+export type JsonRpcMessage =
+  | JsonRpcRequest
+  | JsonRpcNotification
+  | JsonRpcResponse;
 
 export interface JsonRpcError {
   code: number;
@@ -51,4 +66,5 @@ export const JsonRpcErrorCode = {
 export const JsonRpcMethod = {
   CALL_HANDLER: "callHandler",
   EXECUTE_CODE: "executeCode",
+  LOG: "log",
 } as const;

@@ -5,7 +5,11 @@
  * Communicates with host via JSON-RPC over stdin/stdout.
  */
 
-import { JsonRpcMethod, type JsonRpcRequest } from "../src/types.ts";
+import {
+  JsonRpcMethod,
+  type JsonRpcRequest,
+  type LogLevel,
+} from "../src/types.ts";
 
 // Global state
 const logs: string[] = [];
@@ -14,12 +18,22 @@ const pendingResponses = new Map<
   { resolve: (value: unknown) => void; reject: (error: Error) => void }
 >();
 let messageBuffer = "";
+const encoder = new TextEncoder();
+
+/**
+ * Send JSON-RPC notification to host (no id, no response expected)
+ */
+function sendNotification(method: string, params?: unknown): void {
+  const notification = JSON.stringify({ jsonrpc: "2.0", method, params }) +
+    "\n";
+  // Fire-and-forget; ignore back-pressure for notifications
+  Deno.stdout.write(encoder.encode(notification)).catch(() => {});
+}
 
 /**
  * Send JSON-RPC request to host and wait for response
  */
 async function sendRequest(method: string, params?: unknown): Promise<unknown> {
-  const encoder = new TextEncoder();
   const requestId = crypto.randomUUID();
 
   const request = JSON.stringify({
@@ -54,15 +68,19 @@ async function executeCode(
 ): Promise<{ logs: string[]; result?: unknown; error?: string }> {
   logs.length = 0;
 
-  // Console that captures output
+  // Helper: emit a log notification and collect into logs[]
+  const emitLog = (level: LogLevel, ...args: unknown[]) => {
+    const text = args.map(formatValue).join(" ");
+    logs.push(text);
+    sendNotification(JsonRpcMethod.LOG, { text, level });
+  };
+
+  // Console that captures output AND streams it immediately to host
   const console = {
-    log: (...args: unknown[]) => logs.push(args.map(formatValue).join(" ")),
-    error: (...args: unknown[]) =>
-      logs.push("ERROR: " + args.map(formatValue).join(" ")),
-    warn: (...args: unknown[]) =>
-      logs.push("WARN: " + args.map(formatValue).join(" ")),
-    info: (...args: unknown[]) =>
-      logs.push("INFO: " + args.map(formatValue).join(" ")),
+    log: (...args: unknown[]) => emitLog("log", ...args),
+    error: (...args: unknown[]) => emitLog("error", ...args),
+    warn: (...args: unknown[]) => emitLog("warn", ...args),
+    info: (...args: unknown[]) => emitLog("info", ...args),
   };
 
   // Create handler functions dynamically

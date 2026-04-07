@@ -2,7 +2,11 @@
  * Simple JSON-RPC 2.0 utilities
  */
 
-import type { JsonRpcRequest, JsonRpcResponse } from "./types.ts";
+import type {
+  JsonRpcMessage,
+  JsonRpcRequest,
+  JsonRpcResponse,
+} from "./types.ts";
 
 export class JsonRpcHandler {
   private requestId = 0;
@@ -23,7 +27,7 @@ export class JsonRpcHandler {
     return { jsonrpc: "2.0", id, error: { code, message } };
   }
 
-  parseMessage(data: string): JsonRpcRequest | JsonRpcResponse | null {
+  parseMessage(data: string): JsonRpcMessage | null {
     try {
       const msg = JSON.parse(data);
       if (msg?.jsonrpc === "2.0") return msg;
@@ -33,7 +37,7 @@ export class JsonRpcHandler {
     return null;
   }
 
-  serializeMessage(message: JsonRpcRequest | JsonRpcResponse): string {
+  serializeMessage(message: JsonRpcMessage): string {
     return JSON.stringify(message);
   }
 }
