@@ -68,6 +68,9 @@ jobs:
         with:
           deno-version: 2.x
 
+      - name: Install Deno Postscript
+        run: deno task install
+
       - name: Run Tests with Coverage
         run: deno test --allow-all --coverage=coverage tests/
 
