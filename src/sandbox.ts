@@ -63,30 +63,58 @@ export class Sandbox {
   }
 
   /**
-   * Find runtime.ts file path, with fallback locations
+   * Find runtime file path.
+   *
+   * Strategy:
+   * 1. Use `import.meta.resolve("@mcpc/handle-sandbox/runtime")` when available
+   *    (works for both JSR and local file URLs).
+   * 2. Fall back to probing sibling paths relative to `import.meta.url` when it
+   *    is a `file:` URL (local development / npm-bundled scenario).
    */
   private getRuntimePath(): string {
-    const baseDir = path.dirname(fileURLToPath(import.meta.url));
+    const resolver = (
+      import.meta as { resolve?: (specifier: string) => string }
+    ).resolve;
 
-    const candidates = [
-      path.join(baseDir, "../runtime/runtime.ts"),
-      path.join(baseDir, "../runtime/runtime.mjs"),
-      path.join(baseDir, "runtime/runtime.ts"),
-      path.join(baseDir, "runtime/runtime.mjs"),
-      path.join(baseDir, "runtime.ts"),
-      path.join(baseDir, "runtime.mjs"),
-    ];
+    // Prefer package-export based resolution — works from any URL scheme
+    if (resolver) {
+      for (
+        const specifier of [
+          "@mcpc/handle-sandbox/runtime",
+          "@mcpc-tech/handle-sandbox/runtime",
+        ]
+      ) {
+        try {
+          const resolved = resolver(specifier);
+          if (resolved.startsWith("file:")) {
+            const filePath = fileURLToPath(resolved);
+            if (existsSync(filePath)) return filePath;
+          }
+        } catch {
+          // specifier not resolvable, try next
+        }
+      }
+    }
 
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) {
-        return candidate;
+    // Fall back to relative probing only when import.meta.url is a file URL
+    if (import.meta.url.startsWith("file:")) {
+      const baseDir = path.dirname(fileURLToPath(import.meta.url));
+      const candidates = [
+        path.join(baseDir, "../runtime/runtime.ts"),
+        path.join(baseDir, "../runtime/runtime.mjs"),
+        path.join(baseDir, "runtime/runtime.ts"),
+        path.join(baseDir, "runtime/runtime.mjs"),
+        path.join(baseDir, "runtime.ts"),
+        path.join(baseDir, "runtime.mjs"),
+      ];
+
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) return candidate;
       }
     }
 
     throw new Error(
-      `Runtime file not found. Tried:\n${
-        candidates.map((p) => `  - ${p}`).join("\n")
-      }`,
+      "Runtime file not found. Make sure @mcpc/handle-sandbox is installed correctly.",
     );
   }
 

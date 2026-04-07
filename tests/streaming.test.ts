@@ -191,3 +191,59 @@ Deno.test({
     s2.stop();
   },
 });
+
+Deno.test({
+  name: "compat: execute logs preserve legacy level prefixes",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: async () => {
+    const sandbox = new Sandbox();
+    sandbox.start();
+
+    const result = await sandbox.execute(`
+      console.log("plain");
+      console.warn("warned");
+      console.error("errored");
+      console.info("infoed");
+    `);
+
+    assertEquals(result.logs, [
+      "plain",
+      "WARN: warned",
+      "ERROR: errored",
+      "INFO: infoed",
+    ]);
+
+    sandbox.stop();
+  },
+});
+
+Deno.test({
+  name:
+    "streaming: high-volume onLog is complete and ordered before execute resolves",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: async () => {
+    const received: string[] = [];
+    const sandbox = new Sandbox({
+      onLog: (text) => received.push(text),
+    });
+    sandbox.start();
+
+    const total = 500;
+    const result = await sandbox.execute(`
+      for (let i = 0; i < ${total}; i++) {
+        console.log("line-" + i);
+      }
+      return ${total};
+    `);
+
+    assertEquals(result.result, total);
+    assertEquals(
+      received,
+      Array.from({ length: total }, (_, i) => `line-${i}`),
+    );
+
+    sandbox.stop();
+  },
+});

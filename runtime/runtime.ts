@@ -59,6 +59,19 @@ function formatValue(value: unknown): string {
     : String(value);
 }
 
+function formatStoredLog(level: LogLevel, text: string): string {
+  switch (level) {
+    case "error":
+      return `ERROR: ${text}`;
+    case "warn":
+      return `WARN: ${text}`;
+    case "info":
+      return `INFO: ${text}`;
+    default:
+      return text;
+  }
+}
+
 /**
  * Execute user code in sandbox
  */
@@ -71,7 +84,7 @@ async function executeCode(
   // Helper: emit a log notification and collect into logs[]
   const emitLog = (level: LogLevel, ...args: unknown[]) => {
     const text = args.map(formatValue).join(" ");
-    logs.push(text);
+    logs.push(formatStoredLog(level, text));
     sendNotification(JsonRpcMethod.LOG, { text, level });
   };
 
