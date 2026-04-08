@@ -76,7 +76,10 @@ export class Sandbox {
       import.meta as { resolve?: (specifier: string) => string }
     ).resolve;
 
-    // Prefer package-export based resolution — works from any URL scheme
+    // Prefer package-export based resolution — works from any URL scheme.
+    // In JSR-loaded contexts, `import.meta.resolve()` may return a `jsr:`
+    // specifier instead of a local `file:` URL. That specifier is still valid
+    // as a `deno run` entrypoint, so return it directly.
     if (resolver) {
       for (
         const specifier of [
@@ -89,7 +92,9 @@ export class Sandbox {
           if (resolved.startsWith("file:")) {
             const filePath = fileURLToPath(resolved);
             if (existsSync(filePath)) return filePath;
+            continue;
           }
+          if (resolved) return resolved;
         } catch {
           // specifier not resolvable, try next
         }
